@@ -4,7 +4,7 @@ from openai import OpenAI
 import os
 
 # Initialize the client with your API key
-client = OpenAI(api_key=os.environ.get('OPENAI_API_KEY'))
+client = OpenAI()
 
 # Function to download a YouTube video in mp4 format
 def download_yt_video(url):
@@ -58,7 +58,7 @@ def convert_mp4_to_mp3(mp4_filename, mp3_filename):
         print(f"An error occurred: {e}")
 
 # Define the URL for the YouTube video
-url = 'https://youtu.be/m7DcS5Hocrc'
+url = ''
 
 # Call the function with the URL variable
 download_yt_video(url)

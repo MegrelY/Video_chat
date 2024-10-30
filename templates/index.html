@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>YouTube Transcription & Chatbot</title>
+</head>
+<body>
+    <h1>YouTube Transcription and Chatbot App</h1>
+
+    <div>
+        <h2>Step 1: Transcribe YouTube Video</h2>
+        <input type="text" id="youtube_url" placeholder="Enter YouTube URL">
+        <button onclick="startTranscription()">Start Transcription</button>
+    </div>
+
+    <div id="transcription_status" style="display:none;">
+        <h3>Transcription complete! You can now ask the chatbot questions.</h3>
+        <textarea id="context" style="display:none;"></textarea>
+    </div>
+
+    <div id="chatbot_section" style="display:none;">
+        <h2>Step 2: Ask the ChatBot</h2>
+        <input type="text" id="user_question" placeholder="Ask your question">
+        <button onclick="askChatBot()">Ask ChatBot</button>
+    </div>
+
+    <div id="response_section" style="display:none;">
+        <h3>Chatbot Response</h3>
+        <p id="bot_response"></p>
+    </div>
+
+    <script>
+        function startTranscription() {
+            let youtube_url = document.getElementById('youtube_url').value;
+            fetch('/transcribe', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                },
+                body: `youtube_url=${youtube_url}`
+            }).then(response => response.json())
+            .then(data => {
+                if(data.status === 'success') {
+                    document.getElementById('transcription_status').style.display = 'block';
+                    document.getElementById('context').value = data.context;
+                    document.getElementById('chatbot_section').style.display = 'block';
+                } else {
+                    alert(data.message);
+                }
+            });
+        }
+
+        function askChatBot() {
+            let user_question = document.getElementById('user_question').value;
+            let context = document.getElementById('context').value;
+            fetch('/ask', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                },
+                body: `user_question=${user_question}&context=${context}`
+            }).then(response => response.json())
+            .then(data => {
+                if(data.status === 'success') {
+                    document.getElementById('response_section').style.display = 'block';
+                    document.getElementById('bot_response').innerText = data.response;
+                } else {
+                    alert(data.message);
+                }
+            });
+        }
+    </script>
+</body>
+</html>
