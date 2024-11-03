@@ -1,135 +1,94 @@
 import yt_dlp
 from moviepy.editor import VideoFileClip
 from openai import OpenAI
+import re
 import os
 
 # Initialize the client with your API key
 client = OpenAI()
 
-# Function to download a YouTube video in mp4 format
+def get_video_id(url):
+    """Extract the video ID from a YouTube URL."""
+    match = re.search(r'(?:v=|\/)([0-9A-Za-z_-]{11}).*', url)
+    return match.group(1) if match else None
+
+# Function to download a YouTube video in mp4 format and return the filename
 def download_yt_video(url):
-    """
-    Downloads a YouTube video in mp4 format with the filename 'temp_video.mp4'.
-    
-    Parameters:
-    url (str): The URL of the YouTube video.
-    
-    Returns:
-    None
-    """
+    """Downloads a YouTube video in mp4 format with a unique filename."""
     try:
+        video_id = get_video_id(url)
+        if not video_id:
+            print("Invalid YouTube URL.")
+            return None
+        
+        # Define a unique filename using the video ID
+        output_filename = f"temp_video_{video_id}.mp4"
+        
         ydl_opts = {
             'format': 'mp4/best',
-            'outtmpl': 'temp_video.mp4',  # Output filename
+            'outtmpl': output_filename,    # Unique filename based on video ID
+            'noplaylist': True,            # Download only the video, not the playlist
+            'nocheckcertificate': True,    # Bypass SSL certificate check
+            'force_overwrites': True       # Force overwrite if the file exists
         }
+        
+        # Clear cache to avoid using old metadata
+        with yt_dlp.YoutubeDL() as ydl:
+            ydl.cache.remove()
+
+        # Download the video
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             ydl.download([url])
-        print("Download completed successfully.")
+        
+        print(f"Download completed successfully. File saved as {output_filename}")
+        return output_filename  # Return the unique filename for further use
+        
     except Exception as e:
         print(f"An error occurred: {e}")
+        return None
 
 # Function to convert mp4 to mp3
-def convert_mp4_to_mp3(mp4_filename, mp3_filename):
-    """
-    Converts an mp4 video file to an mp3 audio file.
-    
-    Parameters:
-    mp4_filename (str): The name of the mp4 file to be converted.
-    mp3_filename (str): The desired output mp3 filename.
-    
-    Returns:
-    None
-    """
+def convert_mp4_to_mp3(mp4_filename):
+    """Converts an mp4 video file to an mp3 audio file."""
     try:
-        # Load the video file
         video = VideoFileClip(mp4_filename)
-        
-        # Extract audio from the video
         audio = video.audio
-        
-        # Write the audio to an mp3 file
-        audio.write_audiofile(mp3_filename)
-        
-        # Close the audio to release resources
+        audio.write_audiofile("output_audio.mp3")  # Save as a consistent filename for transcription
         audio.close()
-        print(f"Conversion completed successfully. Audio saved as '{mp3_filename}'.")
-    
+        print("Audio extracted and saved as 'output_audio.mp3'.")
     except Exception as e:
         print(f"An error occurred: {e}")
 
-# Define the URL for the YouTube video
-url = ''
-
-# Call the function with the URL variable
-download_yt_video(url)
-
-# Convert the downloaded video to mp3
-convert_mp4_to_mp3('temp_video.mp4', 'output_audio.mp3')
-
-# Transcribe the audio file using OpenAI API
-audio_file = open("output_audio.mp3", "rb")
-try:
-    transcription = client.audio.transcriptions.create(
-        model="whisper-1", 
-        file=audio_file
-    )
-    # Save the transcription to a .txt file
-    with open("transcription.txt", "w", encoding='utf8') as text_file:
-        text_file.write(transcription.text)
-    transcription_text = transcription.text
-    print("Transcription completed successfully.")
-except Exception as e:
-    print(f"An error occurred during transcription: {e}")
-    transcription_text = ""
-finally:
-    audio_file.close()
-
-# Function to start and maintain an ongoing conversation
-def ongoing_conversation(transcription_text):
-    """
-    Start a conversation with GPT-4o, maintaining the conversation history efficiently.
-    
-    Parameters:
-    transcription_text (str): The initial context for the assistant to refer to.
-    
-    Returns:
-    None
-    """
-    # Messages list to hold the conversation history
-    messages = [
-        {"role": "system", "content": "You are a helpful assistant. Answer the user's questions based on the provided context."},
-        {"role": "system", "content": f"Context: {transcription_text}"}
-    ]
-
-    print("Chat with GPT-4o. Type 'exit', 'quit', or 'bye' to end the conversation.")
-    while True:
-        # Get user input
-        user_input = input("You: ")
-
-        # Check if the user wants to exit
-        if user_input.lower() in ['exit', 'quit', 'bye']:
-            print("GPT-4o: Goodbye!")
-            break
-
-        # Append the user's message to the conversation history
-        messages.append({"role": "user", "content": user_input})
-
-        # Get the assistant's response using OpenAI API
-        try:
-            completion = client.chat.completions.create(
-                model="gpt-4-turbo-preview",  # Updated to use the latest model
-                messages=messages
+# Function to transcribe audio to text
+def transcribe_audio_to_text():
+    """Transcribes the 'output_audio.mp3' file using OpenAI API and saves to 'transcription.txt'."""
+    try:
+        with open("output_audio.mp3", "rb") as audio_file:
+            transcription = client.audio.transcriptions.create(
+                model="whisper-1", 
+                file=audio_file
             )
+            with open("transcription.txt", "w", encoding='utf8') as text_file:
+                text_file.write(transcription.text)
+            print("Transcription completed successfully.")
+    except Exception as e:
+        print(f"An error occurred during transcription: {e}")
 
-            # Extract the response
-            assistant_response = completion.choices[0].message.content
-            print(f"GPT-4o: {assistant_response}")
+# Main function to run the complete process
+def process_youtube_video(url):
+    # Step 1: Download video
+    video_filename = download_yt_video(url)
+    if not video_filename:
+        print("Failed to download video.")
+        return
 
-            # Append the assistant's response to the conversation history
-            messages.append({"role": "assistant", "content": assistant_response})
+    # Step 2: Convert downloaded video to mp3
+    convert_mp4_to_mp3(video_filename)
+    
+    # Step 3: Transcribe the audio
+    transcribe_audio_to_text()
 
-        except Exception as e:
-            print(f"An error occurred: {e}")
-
+# Example usage
 if __name__ == "__main__":
-    ongoing_conversation(transcription_text)
+    url = input("Please enter the YouTube video URL: ")
+    process_youtube_video(url)

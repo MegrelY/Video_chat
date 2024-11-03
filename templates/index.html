@@ -2,9 +2,140 @@
 <html>
 <head>
     <title>YouTube Transcription & Chatbot</title>
+    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+    <style>
+        /* Background */
+        body {
+            background: url("{{ url_for('static', filename='background2.webp') }}") no-repeat center center,
+                        linear-gradient(135deg, #0f0c29, #302b63, #24243e); /* Fills white areas with matching gradient */
+            background-size: cover; /* Covers the entire screen */
+            background-attachment: fixed; /* Keeps the background fixed when scrolling */
+            color: #ffffff;
+            font-family: Arial, sans-serif;
+            text-align: center;
+            margin: 0;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            padding: 0 10vw;
+        }
+
+        /* Header Styling with Pixel Effect */
+        h1 {
+            font-family: 'Press Start 2P', cursive;
+            color: #ff69b4;
+            font-size: 2.5em;
+            background-color: rgba(0, 0, 0, 0.6); /* Semi-transparent background for readability */
+            padding: 15px 25px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            max-width: 90%;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            box-shadow: 0 0 10px #ff69b4, 0 0 20px #ff69b4;
+            border: 3px dashed #00e5ff;
+            position: relative;
+            overflow: hidden;
+            /* Adding a pixelated "static" animation effect */
+            animation: pixelate 1.5s steps(1) infinite;
+        }
+
+        @keyframes pixelate {
+            0% { transform: translate(1px, -1px); }
+            25% { transform: translate(-1px, 1px); }
+            50% { transform: translate(-1px, -1px); }
+            75% { transform: translate(1px, 1px); }
+            100% { transform: translate(0, 0); }
+        }
+
+        h2, h3 {
+            color: #00e5ff;
+            font-size: 1.8em;
+            text-shadow: 0 0 5px #00e5ff, 0 0 10px #00e5ff;
+        }
+
+        /* Input Fields */
+        input[type="text"] {
+            background-color: rgba(0, 0, 0, 0.7); /* Darker background for readability */
+            border: 2px solid #ff69b4;
+            border-radius: 5px;
+            color: #ffffff;
+            padding: 10px;
+            width: 60%;
+            margin-top: 10px;
+            margin-bottom: 10px;
+            text-align: center;
+            outline: none;
+            font-size: 16px;
+            box-shadow: 0 0 8px #ff69b4, 0 0 12px #ff69b4;
+        }
+
+        input[type="text"]::placeholder {
+            color: #ffb3d9; /* Lighter color for placeholder text */
+        }
+
+        input[type="text"]:focus {
+            box-shadow: 0 0 15px #ff69b4, 0 0 25px #ff69b4;
+        }
+
+        /* Buttons */
+        button {
+            background-color: transparent;
+            border: 2px solid #00e5ff;
+            border-radius: 5px;
+            color: #00e5ff;
+            padding: 10px 20px;
+            font-size: 16px;
+            cursor: pointer;
+            margin-top: 10px;
+            transition: 0.3s ease;
+            box-shadow: 0 0 8px #00e5ff, 0 0 12px #00e5ff;
+        }
+
+        button:hover {
+            background-color: #00e5ff;
+            color: #000000;
+            box-shadow: 0 0 15px #00e5ff, 0 0 20px #00e5ff;
+        }
+
+        /* Chatbot Response Section */
+        #response_section {
+            display: none;
+            background-color: rgba(0, 0, 0, 0.8);
+            border: 2px solid #ff69b4;
+            padding: 20px;
+            border-radius: 10px;
+            margin-top: 20px;
+            box-shadow: 0 0 20px #ff69b4, 0 0 30px #00e5ff;
+            max-width: 80%;
+        }
+
+        #bot_response {
+            color: #ffffff;
+            font-size: 1.1em;
+            text-align: left;
+            margin-top: 10px;
+            padding: 10px;
+            background-color: rgba(255, 255, 255, 0.1);
+            border: 1px solid #00e5ff;
+            border-radius: 8px;
+            box-shadow: 0 0 10px #00e5ff, 0 0 15px #ff69b4;
+            line-height: 1.5em;
+        }
+
+        /* Transcription Status */
+        #transcription_status, #chatbot_section {
+            margin-top: 20px;
+            padding: 10px;
+            color: #ff69b4;
+            text-shadow: 0 0 10px #ff69b4, 0 0 20px #ff69b4;
+        }
+    </style>
 </head>
 <body>
-    <h1>YouTube Transcription and Chatbot App</h1>
+    <h1>YouTube Transcription ChatApp</h1>
 
     <div>
         <h2>Step 1: Transcribe YouTube Video</h2>
@@ -23,7 +154,7 @@
         <button onclick="askChatBot()">Ask ChatBot</button>
     </div>
 
-    <div id="response_section" style="display:none;">
+    <div id="response_section">
         <h3>Chatbot Response</h3>
         <p id="bot_response"></p>
     </div>
@@ -31,12 +162,19 @@
     <script>
         function startTranscription() {
             let youtube_url = document.getElementById('youtube_url').value;
+            
+            // Check if the URL is entered
+            if (!youtube_url) {
+                alert("Please enter a YouTube URL.");
+                return;
+            }
+    
             fetch('/transcribe', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/x-www-form-urlencoded',
                 },
-                body: `youtube_url=${youtube_url}`
+                body: `youtube_url=${encodeURIComponent(youtube_url)}`
             }).then(response => response.json())
             .then(data => {
                 if(data.status === 'success') {
@@ -46,9 +184,11 @@
                 } else {
                     alert(data.message);
                 }
+            }).catch(error => {
+                alert("An error occurred. Please try again.");
             });
         }
-
+    
         function askChatBot() {
             let user_question = document.getElementById('user_question').value;
             let context = document.getElementById('context').value;
@@ -69,5 +209,6 @@
             });
         }
     </script>
+    
 </body>
 </html>
